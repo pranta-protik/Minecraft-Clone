@@ -6,32 +6,107 @@ public class Chunk : MonoBehaviour
     [SerializeField] private MeshRenderer _meshRenderer;
     [SerializeField] private MeshFilter _meshFilter;
 
+    private int _vertexIndex;
+    private List<Vector3> _vertices = new();
+    private List<int> _triangles = new();
+    private List<Vector2> _uvs = new();
+    private bool[,,] _voxelMap = new bool[VoxelData.chunkWidth, VoxelData.chunkHeight, VoxelData.chunkWidth];
+
     private void Start()
     {
-        var vertexIndex = 0;
-        var vertices = new List<Vector3>();
-        var triangles = new List<int>();
-        var uvs = new List<Vector2>();
+        PopulateVoxelMap();
+        CreateMeshData();
+        CreateMesh();
+    }
 
-        for (var p = 0; p < 6; p++)
+    private void PopulateVoxelMap()
+    {
+        for (var y = 0; y < VoxelData.chunkHeight; y++)
         {
-            for (var i = 0; i < 6; i++)
+            for (var x = 0; x < VoxelData.chunkWidth; x++)
             {
-                var triangleIndex = VoxelData.voxelTris[p, i];
-                vertices.Add(VoxelData.voxelVerts[triangleIndex]);
-                triangles.Add(vertexIndex);
-
-                uvs.Add(VoxelData.voxelUvs[i]);
-
-                vertexIndex++;
+                for (var z = 0; z < VoxelData.chunkWidth; z++)
+                {
+                    _voxelMap[x, y, z] = true;
+                }
             }
         }
+    }
 
+    private void CreateMeshData()
+    {
+        for (var y = 0; y < VoxelData.chunkHeight; y++)
+        {
+            for (var x = 0; x < VoxelData.chunkWidth; x++)
+            {
+                for (var z = 0; z < VoxelData.chunkWidth; z++)
+                {
+                    AddVoxelDataToChunk(new Vector3(x, y, z));
+                }
+            }
+        }
+    }
+
+    private bool CheckVoxel(Vector3 pos)
+    {
+        var x = Mathf.FloorToInt(pos.x);
+        var y = Mathf.FloorToInt(pos.y);
+        var z = Mathf.FloorToInt(pos.z);
+
+        if (x < 0 || x > VoxelData.chunkWidth - 1 || y < 0 || y > VoxelData.chunkHeight - 1 || z < 0 || z > VoxelData.chunkWidth - 1)
+        {
+            return false;
+        }
+
+        return _voxelMap[x, y, z];
+    }
+
+    private void AddVoxelDataToChunk(Vector3 pos)
+    {
+        for (var p = 0; p < 6; p++)
+        {
+            if (!CheckVoxel(pos + VoxelData.faceChecks[p]))
+            {
+                _vertices.Add(pos + VoxelData.voxelVerts[VoxelData.voxelTris[p, 0]]);
+                _vertices.Add(pos + VoxelData.voxelVerts[VoxelData.voxelTris[p, 1]]);
+                _vertices.Add(pos + VoxelData.voxelVerts[VoxelData.voxelTris[p, 2]]);
+                _vertices.Add(pos + VoxelData.voxelVerts[VoxelData.voxelTris[p, 3]]);
+                
+                _uvs.Add(VoxelData.voxelUvs[0]);
+                _uvs.Add(VoxelData.voxelUvs[1]);
+                _uvs.Add(VoxelData.voxelUvs[2]);
+                _uvs.Add(VoxelData.voxelUvs[3]);
+                
+                _triangles.Add(_vertexIndex);
+                _triangles.Add(_vertexIndex + 1);
+                _triangles.Add(_vertexIndex + 2);
+                _triangles.Add(_vertexIndex + 2);
+                _triangles.Add(_vertexIndex + 1);
+                _triangles.Add(_vertexIndex + 3);
+
+                _vertexIndex += 4;
+
+                // for (var i = 0; i < 6; i++)
+                // {
+                //     var triangleIndex = VoxelData.voxelTris[p, i];
+                //     _vertices.Add(VoxelData.voxelVerts[triangleIndex] + pos);
+                //     _triangles.Add(_vertexIndex);
+                //
+                //     _uvs.Add(VoxelData.voxelUvs[i]);
+                //
+                //     _vertexIndex++;
+                // }
+            }
+        }
+    }
+
+    private void CreateMesh()
+    {
         var mesh = new Mesh
         {
-            vertices = vertices.ToArray(),
-            triangles = triangles.ToArray(),
-            uv = uvs.ToArray()
+            vertices = _vertices.ToArray(),
+            triangles = _triangles.ToArray(),
+            uv = _uvs.ToArray()
         };
         
         mesh.RecalculateNormals();
